@@ -27,13 +27,13 @@ const server = http.createServer(app); // wrap Express in a raw HTTP server
 
 const io = new Server(server, {
   cors: {
-    origin: 'https://realtime-chat-app-szm5-r8grx8fuv.vercel.app/', 
+    origin: 'https://realtime-chat-app-szm5-r8grx8fuv.vercel.app', 
   },
 });
 
 connectDB();
 
-app.use(cors({ origin: 'https://realtime-chat-app-szm5-r8grx8fuv.vercel.app/' }));
+app.use(cors({ origin: 'https://realtime-chat-app-szm5-r8grx8fuv.vercel.app' }));
 app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/messages', messageRoutes);
