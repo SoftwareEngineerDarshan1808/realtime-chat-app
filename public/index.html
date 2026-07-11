@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chat App Test</title>
+</head>
+<body>
+  <h2>Socket.io Connection Test</h2>
+  <p>Status: <span id="status">Connecting...</span></p>
+  <input id="msgInput" placeholder="Type a message" />
+  <button onclick="sendMessage()">Send</button>
+  <ul id="messages"></ul>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io(); // connects automatically to the server that served this page
+
+    socket.on('connect', () => {
+      document.getElementById('status').innerText = 'Connected (id: ' + socket.id + ')';
+    });
+
+    socket.on('disconnect', () => {
+      document.getElementById('status').innerText = 'Disconnected';
+    });
+
+    // Listen for a "chat message" event from server
+    socket.on('chat message', (msg) => {
+      const li = document.createElement('li');
+      li.textContent = msg;
+      document.getElementById('messages').appendChild(li);
+    });
+
+    function sendMessage() {
+      const input = document.getElementById('msgInput');
+      socket.emit('chat message', input.value);
+      input.value = '';
+    }
+  </script>
+</body>
+</html>
