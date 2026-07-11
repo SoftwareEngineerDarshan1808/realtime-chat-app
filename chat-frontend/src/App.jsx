@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Sidebar from './components/Sidebar';
@@ -14,6 +14,10 @@ export default function App() {
   });
   const [selected, setSelected] = useState(null);
   const [view, setView] = useState('login');
+
+  useEffect(() => {
+    document.body.setAttribute('data-theme', user?.theme || 'dark');
+  }, [user?.theme]);
 
   const handleLogin = (t, u) => {
     localStorage.setItem('token', t);

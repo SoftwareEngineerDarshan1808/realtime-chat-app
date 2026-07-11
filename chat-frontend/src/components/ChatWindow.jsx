@@ -192,17 +192,18 @@ export default function ChatWindow({ conversation, currentUser, onLeaveRoom }) {
           )}
         </div>
         {conversation.type === 'room' && (
-          <button
-            className="join-btn"
-            style={{ marginLeft: 'auto' }}
-            onClick={loadPendingRequests}
-          >
-            Join Requests
-          </button>
-        )}
-        <button className="logout-btn" onClick={handleLeaveRoom}>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            {conversation.isCreator && (
+              <button className="join-btn" onClick={loadPendingRequests}>
+                ...
+              </button>
+            )}
+            <button className="logout-btn" onClick={handleLeaveRoom}>
           Leave Room
         </button>
+          </div>
+        )}
+        
       </div>
 
       {conversation.type === 'room' && showRequests && (

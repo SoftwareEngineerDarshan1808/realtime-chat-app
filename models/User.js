@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema(
     nickname: {
       type: String,
       default: '',
-      trim: true
+      trim: true,
     },
     email: {
       type: String,
@@ -16,6 +16,11 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
     password: { type: String, required: true, minlength: 6 },
+    theme: {
+      type: String,
+      enum: ['dark', 'light', 'midnight', 'sunset'],
+      default: 'dark',
+    },
   },
   { timestamps: true },
 );

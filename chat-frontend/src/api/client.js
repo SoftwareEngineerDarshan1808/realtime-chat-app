@@ -1,5 +1,4 @@
-const BASE_URL = 'http://localhost:5000';
-
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const request = async (path, options = {}) => {
   const token = localStorage.getItem('token');
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -33,6 +32,12 @@ export const updateNickname = (nickname) =>
     body: JSON.stringify({ nickname }),
   });
 
+export const updateTheme = (theme) =>
+  request('/api/auth/theme', {
+    method: 'PUT',
+    body: JSON.stringify({ theme }),
+  });
+
 export const getUsers = () => request('/api/auth/users');
 
 export const createRoom = (name, memberIds) =>
@@ -62,8 +67,8 @@ export const respondToRoomRequest = (roomId, userId, action) =>
   });
 
 export const leaveRoom = (roomId) =>
-  request(`/api/rooms/${roomId}/leave`, { 
-    method: 'POST' 
-});
+  request(`/api/rooms/${roomId}/leave`, {
+    method: 'POST',
+  });
 
 export { BASE_URL };

@@ -4,9 +4,11 @@ import {
   getAllRooms,
   requestJoinRoom,
   updateNickname,
+  updateTheme,
 } from '../api/client';
 import { useSocket } from '../context/useSocket'; // FIXED — was '../context/SocketContext'
 import CreateRoomModal from './CreateRoomModel'; // FIXED — capital C/R/M to match filename exactly
+import SettingsMenu from './SettingsMenu';
 
 export default function Sidebar({
   currentUser,
@@ -51,6 +53,14 @@ export default function Sidebar({
     });
     setEditingNickname(false);
   };
+  const handleThemeChange = async (theme) => {
+    const data = await updateTheme(theme);
+    setCurrentUser((prev) => {
+      const updated = { ...prev, theme: data.theme };
+      localStorage.setItem('user', JSON.stringify(updated));
+      return updated;
+    });
+  };
 
   const displayName = currentUser?.nickname || currentUser?.name;
 
@@ -58,30 +68,12 @@ export default function Sidebar({
     <div className="sidebar">
       <div className="sidebar-header profile-row">
         <div className="avatar">{displayName?.[0]?.toUpperCase()}</div>
-
-        {editingNickname ? (
-          <input
-            className="nickname-input"
-            value={nicknameInput}
-            placeholder="Set a nickname"
-            onChange={(e) => setNicknameInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && saveNickname()}
-            onBlur={saveNickname}
-            autoFocus
-          />
-        ) : (
-          <div
-            className="profile-name"
-            onClick={() => setEditingNickname(true)}
-          >
-            <span className="name-text">{displayName}</span>
-            <span className="edit-hint">edit</span>
-          </div>
-        )}
-
-        <button className="logout-btn" onClick={onLogout}>
-          Logout
-        </button>
+        <div className="profile-name-static">{displayName}</div>
+        <SettingsMenu
+          currentUser={currentUser}
+          setCurrentUser={setCurrentUser}
+          onLogout={onLogout}
+        />
       </div>
 
       <div className="tabs">
