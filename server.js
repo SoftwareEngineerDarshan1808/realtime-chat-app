@@ -11,6 +11,7 @@ const roomRoutes = require('./routes/roomRoutes');
 const socketAuth = require('./sockets/socketAuth');
 const Message = require('./models/Message');
 const Room = require('./models/Room');
+const User = require('./models/User')
 const {
   addUser,
   removeUser,
@@ -23,13 +24,13 @@ const server = http.createServer(app); // wrap Express in a raw HTTP server
 
 const io = new Server(server, {
   cors: {
-    origin: '*', // for local dev only — lock this down later
+    origin: 'http://localhost:5173', // for local dev only — lock this down later
   },
 });
 
 connectDB();
 
-app.use(cors());
+app.use(cors({ origin: 'http://localhost:5173' }));
 app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/messages', messageRoutes);
@@ -41,7 +42,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Socket.io authentication middleware — runs before any connection is accepted
 io.use(socketAuth);
 
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
   console.log(`${socket.user.name} connected (socket id: ${socket.id})`);
 
   // Register this user as online
@@ -50,40 +51,63 @@ io.on('connection', (socket) => {
   // Broadcast updated online list to everyone
   io.emit('online users', getOnlineUserIds());
 
+  // mark them delivered, and notify each original sender if they're online
+  const undelivered = await Message.find({ receiver: socket.user.id, status: 'sent' });
+  for (const msg of undelivered) {
+    msg.status = 'delivered';
+    await msg.save();
+    const senderSocketId = getSocketId(msg.sender.toString());
+    if (senderSocketId) {
+      io.to(senderSocketId).emit('message delivered', { messageId: msg._id, receiverId: socket.user.id });
+    }
+  }
+
+
   // Private 1-to-1 message handler
   socket.on('private message', async ({ receiverId, text }) => {
     try {
+      const receiverSocketId = getSocketId(receiverId);
+      
       const message = await Message.create({
         sender: socket.user.id,
         receiver: receiverId,
         text,
+        status: receiverSocketId ? 'delivered' : 'sent'
       });
 
-      const receiverSocketId = getSocketId(receiverId);
+      const senderUser = await User.findById(socket.user.id).select('name nickname');
+      const displayName = senderUser.nickname || senderUser.name;
 
-      // Deliver instantly if receiver is online
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('private message', {
-          _id: message._id,
-          sender: socket.user.id,
-          senderName: socket.user.name,
-          text,
-          createdAt: message.createdAt,
-        });
-      }
-      // If receiver is offline, message is already saved in MongoDB —
-
-      // Echo back to sender so their own UI updates too
-      socket.emit('private message', {
+      const payload = {
         _id: message._id,
         sender: socket.user.id,
-        senderName: socket.user.name,
+        senderName: displayName,
         text,
+        status: message.status,
         createdAt: message.createdAt,
-      });
+      };
+
+      // Deliver instantly if receiver is online
+      if (receiverSocketId) io.to(receiverSocketId).emit('private message', payload);
+      socket.emit('private message', payload);
     } catch (err) {
       console.error('Error in private message handler:', err);
       socket.emit('error message', 'Failed to send message');
+    }
+  });
+
+  // mark messages from a specific person as "seen" when I open that chat
+  socket.on('mark seen', async ({ otherUserId }) => {
+    const result = await Message.updateMany(
+      { sender: otherUserId, receiver: socket.user.id, status: { $ne: 'seen' } },
+      { status: 'seen' }
+    );
+
+    if (result.modifiedCount > 0) {
+      const otherSocketId = getSocketId(otherUserId);
+      if (otherSocketId) {
+        io.to(otherSocketId).emit('messages seen', { by: socket.user.id });
+      }
     }
   });
 
@@ -95,9 +119,7 @@ io.on('connection', (socket) => {
     if (!room || !room.members.map(String).includes(socket.user.id)) {
       return socket.emit('error message', 'Not authorized to join this room');
     }
-
     socket.join(roomId); // Socket.io's built-in room mechanism
-    console.log(`${socket.user.name} joined room ${roomId}`);
   });
 
   // group message handler
@@ -108,6 +130,9 @@ io.on('connection', (socket) => {
         room: roomId,
         text,
       });
+
+      const senderUser = await User.findById(socket.user.id).select('name nickname');
+      const displayName = senderUser.nickname || senderUser.name;
 
       // Broadcast to everyone in the room, INCLUDING sender
       io.to(roomId).emit('room message', {

@@ -30,6 +30,9 @@ const listAllRooms = async (req, res) => {
       const myRequest = room.joinRequests.find(
         (r) => r.user.toString() === userId,
       );
+      const isCreator = room.createdBy.toString() === userId; 
+      const pendingCount = room.joinRequests.filter((r) => r.status === 'pending').length;
+
 
       let status = 'not_joined';
       if (isMember) status = 'joined';
@@ -43,6 +46,8 @@ const listAllRooms = async (req, res) => {
         name: room.name,
         memberCount: room.members.length,
         status, // 'joined' | 'not_joined' | 'requested' | 'declined'
+        isCreator,
+        pendingCount
       };
     });
 
@@ -105,10 +110,10 @@ const getPendingRequests = async (req, res) => {
     );
     if (!room) return res.status(404).json({ message: 'Room not found' });
 
-    if (!room.members.map(String).includes(req.user.id)) {
+    if (room.createdBy.toString() !== req.user.id) {
       return res
         .status(403)
-        .json({ message: 'Only members can view requests' });
+        .json({ message: 'Only the room creator can view requests' });
     }
 
     const pending = room.joinRequests.filter((r) => r.status === 'pending');
@@ -127,10 +132,10 @@ const respondToRequest = async (req, res) => {
     const room = await Room.findById(roomId);
     if (!room) return res.status(404).json({ message: 'Room not found' });
 
-    if (!room.members.map(String).includes(req.user.id)) {
+    if (room.createdBy.toString() !== req.user.id) { 
       return res
         .status(403)
-        .json({ message: 'Only members can respond to requests' });
+        .json({ message: 'Only the room creator can view requests' });
     }
 
     const request = room.joinRequests.find(
@@ -165,9 +170,24 @@ const leaveRoom = async (req, res) => {
     const room = await Room.findById(req.params.roomId);
     if (!room) return res.status(404).json({ message: 'Room not found' });
 
-    room.members = room.members.filter((m) => m.toString() !== req.user.id);
-    await room.save();
+    const isCreator = room.createdBy.toString() === req.user.id;
+    const otherMembers = room.members.filter((m) => m.toString() !== req.user.id);
 
+    if (isCreator && otherMembers.length > 0) {
+      return res.status(400).json({
+        message: 'You must remove all other members (or transfer ownership) before leaving this room',
+      });
+    }
+
+    room.members = otherMembers;
+
+    // If creator was the last member, delete the empty room entirely
+    if (isCreator && otherMembers.length === 0) {
+      await Room.findByIdAndDelete(room._id);
+      return res.status(200).json({ message: 'Room deleted (you were the last member)' });
+    }
+
+    await room.save();
     res.status(200).json({ message: 'Left the room' });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });

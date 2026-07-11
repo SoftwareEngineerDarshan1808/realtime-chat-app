@@ -14,8 +14,8 @@ const getConversation = async (req, res) => {
     })
       .sort({ createdAt: 1 }) // oldest first, so chat reads top-to-bottom naturally
       .limit(50) // basic cap for now — real pagination comes later if needed
-      .populate('sender', 'name')
-      .populate('receiver', 'name');
+      .populate('sender', 'name nickname')
+      .populate('receiver', 'name nickname');
 
     res.status(200).json({ messages });
   } catch (err) {

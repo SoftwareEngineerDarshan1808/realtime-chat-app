@@ -45,11 +45,35 @@ const login = async (req, res) => {
     res.status(200).json({
       message: 'Login successful',
       token,
-      user: { id: user._id, name: user.name, email: user.email },
+      user: { id: user._id, name: user.name, nickname: user.nickname, email: user.email },
     });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
 
-module.exports = { register, login };
+const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find({ _id: { $ne: req.user.id } }).select('name nickname email');
+    res.status(200).json({ users });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+const updateNickname = async (req, res) => {
+  try {
+    const { nickname } = req.body;
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { nickname: nickname || '' },
+      { new: true }
+    ).select('name nickname email');
+
+    res.status(200).json({ message: 'Nickname updated', user });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+module.exports = { register, login, getAllUsers, updateNickname };

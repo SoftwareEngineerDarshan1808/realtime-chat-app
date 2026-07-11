@@ -10,14 +10,18 @@ const messageSchema = new mongoose.Schema(
     receiver: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-    //   required: true,
+      //   required: true,
     },
-    room: { 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: 'Room' 
+    room: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Room',
     },
     text: { type: String, required: true },
-    read: { type: Boolean, default: false },
+    status: {
+      type: String,
+      enum: ['sent', 'delivered', 'seen'],
+      default: 'sent',
+    },
   },
   { timestamps: true },
 );
