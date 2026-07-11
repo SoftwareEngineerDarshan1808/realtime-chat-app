@@ -5,6 +5,8 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const connectDB = require('./config/db');
+const authRoutes = require('./routes/authRoutes');
+const socketAuth = require('./sockets/socketAuth');
 
 const app = express();
 const server = http.createServer(app); // wrap Express in a raw HTTP server
@@ -19,19 +21,25 @@ connectDB();
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public'))); // serves our test HTML client
+app.use('/api/auth', authRoutes);
+
+// serves our test HTML client
+app.use(express.static(path.join(__dirname, 'public')));
+
+//runs before connection establish
+io.use(socketAuth);
 
 // Basic connection logging — this is the "hello world" of Socket.io
 io.on('connection', (socket) => {
-  console.log(`New client connected: ${socket.id}`);
-  
+  console.log(`${socket.user.name} connected (socket id: ${socket.id})`);
+
   socket.on('chat message', (msg) => {
-    console.log(`Message received: ${msg}`);
-    io.emit('chat message', msg); // broadcast to ALL connected clients, including sender
+    console.log(`${socket.user.name}: ${msg}`);
+    io.emit('chat message', { sender: socket.user.name, text: msg }); // broadcast to ALL connected clients, including sender
   });
-  
+
   socket.on('disconnect', () => {
-    console.log(`Client disconnected: ${socket.id}`);
+    console.log(`${socket.user.name} disconnected`);
   });
 });
 
