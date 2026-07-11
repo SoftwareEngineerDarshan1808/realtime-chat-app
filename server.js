@@ -6,6 +6,7 @@ const cors = require('cors');
 const path = require('path');
 const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
+const messageRoutes = require('./routes/messageRoutes');
 const socketAuth = require('./sockets/socketAuth');
 const Message = require('./models/Message');
 const {
@@ -29,6 +30,7 @@ connectDB();
 app.use(cors());
 app.use(express.json());
 app.use('/api/auth', authRoutes);
+app.use('/api/messages', messageRoutes);
 
 // serves our test HTML client
 app.use(express.static(path.join(__dirname, 'public'))); 
