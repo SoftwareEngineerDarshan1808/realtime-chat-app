@@ -10,7 +10,6 @@
       <input id="password" type="password" placeholder="Password" />
       <button onclick="login()">Login</button>
     </div>
-
     <div id="chatBox" style="display: none">
       <p>Status: <span id="status">Connecting...</span></p>
       <p>Online users: <span id="onlineList"></span></p>
@@ -20,6 +19,23 @@
       <input id="msgInput" placeholder="Type a message" />
       <button onclick="sendMessage()">Send</button>
       <ul id="messages"></ul>
+
+      <hr>
+      <h4>Group Chats</h4>
+      <button onclick="loadAllRooms()">Refresh Room List</button>
+      <ul id="roomList"></ul>
+
+      <div id="activeRoomBox" style="display:none;">
+        <h4 id="activeRoomName"></h4>
+        <button onclick="leaveActiveRoom()">Leave Room</button>
+        <button onclick="loadPendingRequests()">View Join Requests</button>
+        <ul id="pendingRequests"></ul>
+
+        <br>
+        <input id="roomMsgInput" placeholder="Type a room message" />
+        <button onclick="sendRoomMessage()">Send to Room</button>
+        <ul id="roomMessages"></ul>
+      </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
@@ -27,6 +43,8 @@
       let socket;
       let currentUser;
       let authToken;
+      let activeRoomId = null;
+
 
       async function login() {
         const email = document.getElementById('email').value;
@@ -79,9 +97,15 @@
         socket.on('private message', (msgData) => {
           appendMessage(msgData);
         });
+
+        socket.on('room message', (msgData) => {
+          const li = document.createElement('li');
+          li.textContent = `[Room] ${msgData.senderName}: ${msgData.text}`;
+          document.getElementById('roomMessages').appendChild(li);
+        });
       }
 
-      // NEW — fetch and render past messages for a conversation
+      //fetch and render past messages for a conversation
       async function loadHistory() {
         const otherUserId = document.getElementById('receiverId').value;
         if (!otherUserId) return;
@@ -106,7 +130,136 @@
         });
       }
 
-      // NEW — shared rendering function so live messages and history use the same code
+      async function loadAllRooms() {
+        const res = await fetch('/api/rooms/all', {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        const data = await res.json();
+
+        const list = document.getElementById('roomList');
+        list.innerHTML = '';
+
+        data.rooms.forEach((room) => {
+          const li = document.createElement('li');
+          li.textContent = `${room.name} (${room.memberCount} members) — `;
+
+          if (room.status === 'joined') {
+            const openBtn = document.createElement('button');
+            openBtn.textContent = 'Open';
+            openBtn.onclick = () => openRoom(room._id, room.name);
+            li.appendChild(openBtn);
+          } else if (room.status === 'requested') {
+            const span = document.createElement('span');
+            span.textContent = 'Request pending';
+            li.appendChild(span);
+          } else {
+            const reqBtn = document.createElement('button');
+            reqBtn.textContent = 'Request to Join';
+            reqBtn.onclick = () => requestJoin(room._id);
+            li.appendChild(reqBtn);
+          }
+
+          list.appendChild(li);
+        });
+      }
+
+      async function requestJoin(roomId) {
+        const res = await fetch(`/api/rooms/${roomId}/request`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        const data = await res.json();
+        alert(data.message);
+        loadAllRooms();
+      }
+
+      function openRoom(roomId, roomName) {
+        activeRoomId = roomId;
+        document.getElementById('activeRoomBox').style.display = 'block';
+        document.getElementById('activeRoomName').innerText = roomName;
+        document.getElementById('roomMessages').innerHTML = '';
+        document.getElementById('pendingRequests').innerHTML = '';
+
+        socket.emit('join room', roomId); // joins the live socket room
+        loadRoomHistory(roomId);
+      }
+
+      async function loadRoomHistory(roomId) {
+        const res = await fetch(`/api/messages/room/${roomId}`, {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        const data = await res.json();
+
+        data.messages.forEach((msg) => {
+          const li = document.createElement('li');
+          li.textContent = `[Room] ${msg.sender.name}: ${msg.text}`;
+          document.getElementById('roomMessages').appendChild(li);
+        });
+      }
+
+      async function loadPendingRequests() {
+        const res = await fetch(`/api/rooms/${activeRoomId}/requests`, {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        const data = await res.json();
+
+        const list = document.getElementById('pendingRequests');
+        list.innerHTML = '';
+
+        data.requests.forEach((r) => {
+          const li = document.createElement('li');
+          li.textContent = `${r.user.name} wants to join — `;
+
+          const acceptBtn = document.createElement('button');
+          acceptBtn.textContent = 'Accept';
+          acceptBtn.onclick = () => respondRequest(r.user._id, 'accept');
+
+          const declineBtn = document.createElement('button');
+          declineBtn.textContent = 'Decline';
+          declineBtn.onclick = () => respondRequest(r.user._id, 'decline');
+
+          li.appendChild(acceptBtn);
+          li.appendChild(declineBtn);
+          list.appendChild(li);
+        });
+      }
+
+      async function respondRequest(userId, action) {
+        const res = await fetch(`/api/rooms/${activeRoomId}/requests/${userId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${authToken}`,
+          },
+          body: JSON.stringify({ action }),
+        });
+        const data = await res.json();
+        alert(data.message);
+        loadPendingRequests();
+      }
+
+      async function leaveActiveRoom() {
+        const res = await fetch(`/api/rooms/${activeRoomId}/leave`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        const data = await res.json();
+        alert(data.message);
+
+        document.getElementById('activeRoomBox').style.display = 'none';
+        activeRoomId = null;
+        loadAllRooms();
+      }
+
+      function sendRoomMessage() {
+        const text = document.getElementById('roomMsgInput').value;
+        if (!activeRoomId || !text) return;
+
+        socket.emit('room message', { roomId: activeRoomId, text });
+        document.getElementById('roomMsgInput').value = '';
+      }
+
+      //shared rendering function so live messages and history use the same code
       function appendMessage(msgData) {
         const li = document.createElement('li');
         li.textContent = `${msgData.senderName}: ${msgData.text}`;
