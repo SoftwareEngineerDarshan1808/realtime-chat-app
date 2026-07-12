@@ -15,7 +15,7 @@ const register = async (req, res) => {
     const user = await User.create({ name, email, password: hashedPassword });
 
     //if its invited user 
-    if (inviterId) {
+    if (inviterID) {
       const inviter = await User.findById(inviterId);
       if (inviter) {
         inviter.friends.push(user._id);
@@ -29,6 +29,8 @@ const register = async (req, res) => {
       .status(201)
       .json({ message: 'Registered successfully', userId: user._id });
   } catch (err) {
+        console.error('REGISTER ERROR:', err); // ADD THIS if not already there
+
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };

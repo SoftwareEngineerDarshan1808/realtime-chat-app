@@ -45,7 +45,7 @@ export default function SettingsMenu({ currentUser, setCurrentUser, onLogout }) 
           <div className="menu-backdrop" onClick={() => setOpen(false)} />
           <div className="settings-dropdown">
             <div className="dropdown-section">
-              <label className="dropdown-label">Nickname</label>
+              <label className="dropdown-label">👤Nickname</label>
               {editingNickname ? (
                 <input
                   className="nickname-input"
@@ -63,7 +63,7 @@ export default function SettingsMenu({ currentUser, setCurrentUser, onLogout }) 
             </div>
 
             <div className="dropdown-section">
-              <label className="dropdown-label">Theme</label>
+              <label className="dropdown-label">🎨Theme</label>
               <div className="theme-picker">
                 {THEMES.map((t) => (
                   <button

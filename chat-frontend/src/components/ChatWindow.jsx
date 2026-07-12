@@ -7,15 +7,26 @@ import {
   leaveRoom,
 } from '../api/client';
 import { useSocket } from '../context/useSocket';
+import { getFriends } from '../api/client';
 import MessageBubble from './MessageBubble';
+import UserProfileModal from './UserProfileModal';
+import RoomMembersModal from './RoomMembersModal';
 
-export default function ChatWindow({ conversation, currentUser, onLeaveRoom }) {
+export default function ChatWindow({
+  conversation,
+  currentUser,
+  onLeaveRoom,
+  onSelectConversation,
+}) {
   const [messages, setMessages] = useState([]);
   const [showRequests, setShowRequests] = useState(false);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [text, setText] = useState('');
   const { socket, onlineUsers } = useSocket();
   const bottomRef = useRef(null);
+  const [showMembers, setShowMembers] = useState(false);
+  const [profileUser, setProfileUser] = useState(null);
+  const [friendIds, setFriendIds] = useState([]);
 
   useEffect(() => {
     if (!conversation || !currentUser) return;
@@ -132,6 +143,11 @@ export default function ChatWindow({ conversation, currentUser, onLeaveRoom }) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+  useEffect(() => {
+    getFriends()
+      .then((d) => setFriendIds(d.friends.map((f) => f._id)))
+      .catch(() => {});
+  }, []);
 
   const handleSend = () => {
     if (!text.trim()) return;
@@ -170,6 +186,12 @@ export default function ChatWindow({ conversation, currentUser, onLeaveRoom }) {
     }
   };
 
+  const openProfile = async (user) => {
+  const d = await getFriends();
+  setFriendIds(d.friends.map((f) => f._id));
+  setProfileUser(user);
+};
+
   if (!conversation) {
     return (
       <div className="empty-state">
@@ -184,7 +206,22 @@ export default function ChatWindow({ conversation, currentUser, onLeaveRoom }) {
       <div className="chat-header">
         <div className="avatar">{conversation.name[0].toUpperCase()}</div>
         <div>
-          <div className="name">{conversation.name}</div>
+          <div
+            className="name"
+            style={{ cursor: 'pointer' }}
+            onClick={() => {
+              if (conversation.type === 'dm') {
+                openProfile({
+                  _id: conversation.id,
+                  name: conversation.name,
+                });
+              } else {
+                setShowMembers(true);
+              }
+            }}
+          >
+            {conversation.name}
+          </div>{' '}
           {conversation.type === 'dm' && (
             <div className="status">
               {onlineUsers.includes(conversation.id) ? 'Online' : 'Offline'}
@@ -199,11 +236,10 @@ export default function ChatWindow({ conversation, currentUser, onLeaveRoom }) {
               </button>
             )}
             <button className="logout-btn" onClick={handleLeaveRoom}>
-          Leave Room
-        </button>
+              Leave Room
+            </button>
           </div>
         )}
-        
       </div>
 
       {conversation.type === 'room' && showRequests && (
@@ -262,6 +298,37 @@ export default function ChatWindow({ conversation, currentUser, onLeaveRoom }) {
           ➤
         </button>
       </div>
+      {showMembers && (
+        <RoomMembersModal
+          roomId={conversation.id}
+          currentUser={currentUser}
+          onClose={() => setShowMembers(false)}
+          onMemberClick={(m) => {
+            openProfile(m);
+            setShowMembers(false);
+          }}
+        />
+      )}
+
+      {profileUser && (
+        <UserProfileModal
+          user={profileUser}
+          isFriend={friendIds.includes(profileUser._id)} // refine below
+          onClose={() => setProfileUser(null)}
+          onOpenChat={(u) => {
+            onSelectConversation?.({
+              type: 'dm',
+              id: u._id,
+              name: u.nickname || u.name,
+            });
+            setProfileUser(null);
+          }}
+          onFriendRequestSent={() => {
+            alert('Friend request sent');
+            setFriendIds((prev) => [...prev]);
+          }}
+        />
+      )}
     </div>
   );
 }

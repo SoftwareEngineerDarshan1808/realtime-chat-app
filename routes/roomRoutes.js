@@ -7,6 +7,9 @@ const {
   getPendingRequests,
   respondToRequest,
   leaveRoom,
+  getMembers,
+  removeMember,
+  addMember,
 } = require('../controllers/roomController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -19,5 +22,8 @@ router.post('/:roomId/request', protect, requestToJoin);
 router.get('/:roomId/requests', protect, getPendingRequests);
 router.post('/:roomId/requests/:userId', protect, respondToRequest);
 router.post('/:roomId/leave', protect, leaveRoom);
+router.get('/:roomId/members', protect, getMembers);
+router.post('/:roomId/members/:userId/add', protect, addMember);
+router.post('/:roomId/members/:userId/remove', protect, removeMember);
 
 module.exports = router;

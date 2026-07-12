@@ -14,30 +14,37 @@ const roomRoutes = require('./routes/roomRoutes');
 const socketAuth = require('./sockets/socketAuth');
 const Message = require('./models/Message');
 const Room = require('./models/Room');
-const User = require('./models/User')
+const User = require('./models/User');
 const {
   addUser,
   removeUser,
   getSocketId,
   getOnlineUserIds,
 } = require('./sockets/onlineUser');
+const friendRoutes = require('./routes/friendRoutes');
 
 const app = express();
 const server = http.createServer(app); // wrap Express in a raw HTTP server
 
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://realtime-chat-app-szm5-r8grx8fuv.vercel.app',
+];
+
 const io = new Server(server, {
   cors: {
-    origin: 'https://realtime-chat-app-szm5-r8grx8fuv.vercel.app', 
+    origin: allowedOrigins,
   },
 });
 
 connectDB();
 
-app.use(cors({ origin: 'https://realtime-chat-app-szm5-r8grx8fuv.vercel.app' }));
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/rooms', roomRoutes);
+app.use('/api/friends', friendRoutes);
 
 // serves our test HTML client
 app.use(express.static(path.join(__dirname, 'public')));
@@ -55,30 +62,40 @@ io.on('connection', async (socket) => {
   io.emit('online users', getOnlineUserIds());
 
   // mark them delivered, and notify each original sender if they're online
-  const undelivered = await Message.find({ receiver: socket.user.id, status: 'sent' });
+  const undelivered = await Message.find({
+    receiver: socket.user.id,
+    status: 'sent',
+  });
   for (const msg of undelivered) {
     msg.status = 'delivered';
     await msg.save();
     const senderSocketId = getSocketId(msg.sender.toString());
     if (senderSocketId) {
-      io.to(senderSocketId).emit('message delivered', { messageId: msg._id, receiverId: socket.user.id });
+      io.to(senderSocketId).emit('message delivered', {
+        messageId: msg._id,
+        receiverId: socket.user.id,
+      });
     }
   }
-
 
   // Private 1-to-1 message handler
   socket.on('private message', async ({ receiverId, text }) => {
     try {
+      const sender = await User.findById(socket.user.id);
+      if (!sender.friends.map(String).includes(receiverId)) {
+        return socket.emit('error message', 'You can only message friends');
+      }
       const receiverSocketId = getSocketId(receiverId);
-      
       const message = await Message.create({
         sender: socket.user.id,
         receiver: receiverId,
         text,
-        status: receiverSocketId ? 'delivered' : 'sent'
+        status: receiverSocketId ? 'delivered' : 'sent',
       });
 
-      const senderUser = await User.findById(socket.user.id).select('name nickname');
+      const senderUser = await User.findById(socket.user.id).select(
+        'name nickname',
+      );
       const displayName = senderUser.nickname || senderUser.name;
 
       const payload = {
@@ -91,7 +108,8 @@ io.on('connection', async (socket) => {
       };
 
       // Deliver instantly if receiver is online
-      if (receiverSocketId) io.to(receiverSocketId).emit('private message', payload);
+      if (receiverSocketId)
+        io.to(receiverSocketId).emit('private message', payload);
       socket.emit('private message', payload);
     } catch (err) {
       console.error('Error in private message handler:', err);
@@ -102,8 +120,12 @@ io.on('connection', async (socket) => {
   // mark messages from a specific person as "seen" when I open that chat
   socket.on('mark seen', async ({ otherUserId }) => {
     const result = await Message.updateMany(
-      { sender: otherUserId, receiver: socket.user.id, status: { $ne: 'seen' } },
-      { status: 'seen' }
+      {
+        sender: otherUserId,
+        receiver: socket.user.id,
+        status: { $ne: 'seen' },
+      },
+      { status: 'seen' },
     );
 
     if (result.modifiedCount > 0) {
@@ -134,7 +156,9 @@ io.on('connection', async (socket) => {
         text,
       });
 
-      const senderUser = await User.findById(socket.user.id).select('name nickname');
+      const senderUser = await User.findById(socket.user.id).select(
+        'name nickname',
+      );
       const displayName = senderUser.nickname || senderUser.name;
 
       // Broadcast to everyone in the room, INCLUDING sender

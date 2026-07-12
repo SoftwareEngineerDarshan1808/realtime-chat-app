@@ -21,6 +21,22 @@ const userSchema = new mongoose.Schema(
       enum: ['dark', 'light', 'midnight', 'sunset'],
       default: 'dark',
     },
+    friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    friendRequests: [
+      {
+        from: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          required: true,
+        },
+        status: {
+          type: String,
+          enum: ['pending', 'accepted', 'declined'],
+          default: 'pending',
+        },
+        requestedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true },
 );

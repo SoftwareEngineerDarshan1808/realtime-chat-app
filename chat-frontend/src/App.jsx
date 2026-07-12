@@ -57,6 +57,7 @@ export default function App() {
           conversation={selected}
           currentUser={user}
           onLeaveRoom={() => setSelected(null)}
+          onSelectConversation = {setSelected} 
         />
       </div>
     </SocketProvider>

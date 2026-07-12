@@ -1,6 +1,8 @@
-const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/+$/, '');
+const BASE_URL = (
+  import.meta.env.VITE_API_URL || 'http://localhost:5000'
+).replace(/\/+$/, '');
 const request = async (path, options = {}) => {
-    const cleanPath = path.startsWith('/') ? path : `/${path}`; 
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
   const token = localStorage.getItem('token');
   const res = await fetch(`${BASE_URL}${cleanPath}`, {
     ...options,
@@ -71,5 +73,23 @@ export const leaveRoom = (roomId) =>
   request(`/api/rooms/${roomId}/leave`, {
     method: 'POST',
   });
+
+export const getFriends = () => request('/api/friends');
+export const discoverUsers = () => request('/api/friends/discover');
+export const sendFriendRequest = (userId) =>
+  request(`/api/friends/request/${userId}`, { method: 'POST' });
+export const getIncomingRequests = () => request('/api/friends/requests');
+export const respondToFriendRequest = (fromUserId, action) =>
+  request(`/api/friends/requests/${fromUserId}/respond`, {
+    method: 'POST',
+    body: JSON.stringify({ action }),
+  });
+
+export const getRoomMembers = (roomId) =>
+  request(`/api/rooms/${roomId}/members`);
+export const addMember = (roomId, userId) =>
+  request(`/api/rooms/${roomId}/members/${userId}/add`, { method: 'POST' });
+export const removeMember = (roomId, userId) =>
+  request(`/api/rooms/${roomId}/members/${userId}/remove`, { method: 'POST' });
 
 export { BASE_URL };
